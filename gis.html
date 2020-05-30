@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>GIS GP:06 SGG115</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+         integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+        crossorigin=""/>
+    <link rel="stylesheet" href="css/leaflet-categorized-layer.css"/>
+    <link rel="stylesheet" href="css/leaflet-panel-layers.css"/>
+    <link rel="stylesheet" href="css/legend.css"/>
+    <link rel="stylesheet" href="css/topbar.css"/>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+    body {
+      margin: 0;
+      background-color: #f1f1f1;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    
+    #navbar {
+      background-color: #333;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      display: block;
+      transition: top 0.3s;
+    }
+    
+    #navbar a {
+      float: left;
+      display: block;
+      color: #f2f2f2;
+      text-align: center;
+      padding: 15px;
+      text-decoration: none;
+      font-size: 17px;
+    }
+    
+    #navbar a:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    </style>
+</head>
+<body>
+
+  <div id="navbar">
+    <a href="index.html">INCIO</a>
+    <a href="gis.html" onclick="reiniciarMapa()">REINICIAR SIGFIDA-PTI</a>
+    <a href="contactos.html">CONTACTOS</a>
+  </div>
+  
+  <div style="padding:15px 15px 2500px;font-size:30px;margin-top:30px;">
+   
+  
+  <script>
+  var prevScrollpos = window.pageYOffset;
+  window.onscroll = function() {
+  var currentScrollPos = window.pageYOffset;
+    if (prevScrollpos > currentScrollPos) {
+      document.getElementById("navbar").style.top = "0";
+    } else {
+      document.getElementById("navbar").style.top = "-50px";
+    }
+    prevScrollpos = currentScrollPos;
+  }
+  </script>
+  
+
+    <div id="myMap" style="height: 610px"></div>
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+
+
+</div>
+
+   <!--Leaflet-js-->
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+    integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+    crossorigin="">
+    </script>
+
+    <!--leaflet-headers-->
+   <script>'use strict';
+
+    async function fetchImage(url, callback, headers, abort) {
+      let _headers = {};
+      if (headers) {
+        headers.forEach(h => {
+          _headers[h.header] = h.value;
+        });
+      }
+      const controller = new AbortController();
+      const signal = controller.signal;
+      if (abort) {
+        abort.subscribe(() => {
+          controller.abort();
+        });
+      }
+      const f = await fetch(url, {
+        method: "GET",
+        headers: _headers,
+        mode: "cors",
+        signal: signal
+      });
+      const blob = await f.blob();
+      callback(blob);
+    }
+
+    L.TileLayer.WMSHeader = L.TileLayer.WMS.extend({
+      initialize: function (url, options, headers, abort) {
+        L.TileLayer.WMS.prototype.initialize.call(this, url, options);
+        this.headers = headers;
+        this.abort = abort;
+      },
+      createTile(coords, done) {
+        const url = this.getTileUrl(coords);
+        const img = document.createElement("img");
+        img.setAttribute("role", "presentation");
+
+        fetchImage(
+          url,
+          resp => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              img.src = reader.result;
+            };
+            reader.readAsDataURL(resp);
+            done(null, img);
+          },
+          this.headers,
+          this.abort
+        );
+        return img;
+      }
+    });
+
+    L.TileLayer.wmsHeader = function (url, options, headers, abort) {
+      return new L.TileLayer.WMSHeader(url, options, headers, abort);
+    };
+    </script>
+
+    <!--leaflet-source-->
+   <script>/*!
+    * leaflet.wms.js
+    * A collection of Leaflet utilities for working with Web Mapping services.
+    * (c) 2014-2016, Houston Engineering, Inc.
+    * MIT License
+    */
+
+   (function (factory) {
+       // Module systems magic dance, Leaflet edition
+       if (typeof define === 'function' && define.amd) {
+           // AMD
+           define(['leaflet'], factory);
+       } else if (typeof module !== 'undefined') {
+           // Node/CommonJS
+           module.exports = factory(require('leaflet'));
+       } else {
+           // Browser globals
+           if (typeof this.L === 'undefined')
+               throw 'Leaflet must be loaded first!';
+           // Namespace
+           this.L.WMS = this.L.wms = factory(this.L);
+       }
+   }(function (L) {
+
+   // Module object
+   var wms = {};
+
+   // Quick shim for Object.keys()
+   if (!('keys' in Object)) {
+       Object.keys = function(obj) {
+           var result = [];
+           for (var i in obj) {
+               if (obj.hasOwnProperty(i)) {
+                   result.push(i);
+               }
+           }
+           return result;
+       };
+   }
+
+   /*
+    * wms.Source
+    * The Source object manages a single WMS connection.  Multiple "layers" can be
+    * created with the getLayer function, but a single request will be sent for
+    * each image update.  Can be used in non-tiled "overlay" mode (default), or
+    * tiled mode, via an internal wms.Overlay or wms.TileLayer, respectively.
+    */
+   wms.Source = L.Layer.extend({
+       'options': {
+           'untiled': true,
+           'identify': true
+       },
+
+       'initialize': function(url, options) {
+           L.setOptions(this, options);
+           if (this.options.tiled) {
+               this.options.untiled = false;
+           }
+           this._url = url;
+           this._subLayers = {};
+           this._overlay = this.createOverlay(this.options.untiled);
+       },
+
+       'createOverlay': function(untiled) {
+           // Create overlay with all options other than untiled & identify
+           var overlayOptions = {};
+           for (var opt in this.options) {
+               if (opt != 'untiled' && opt != 'identify') {
+                   overlayOptions[opt] = this.options[opt];
+               }
+           }
+           if (untiled) {
+               return wms.overlay(this._url, overlayOptions);
+           } else {
+               return wms.tileLayer(this._url, overlayOptions);
+           }
+       },
+
+       'onAdd': function() {
+           this.refreshOverlay();
+       },
+
+       'getEvents': function() {
+           if (this.options.identify) {
+               return {'click': this.identify};
+           } else {
+               return {};
+           }
+       },
+
+       'setOpacity': function(opacity) {
+            this.options.opacity = opacity;
+            if (this._overlay) {
+                this._overlay.setOpacity(opacity);
+            }
+       },
+
+       'bringToBack': function() {
+            this.options.isBack = true;
+            if (this._overlay) {
+                this._overlay.bringToBack();
+            }
+       },
+
+       'bringToFront': function() {
+            this.options.isBack = false;
+            if (this._overlay) {
+                this._overlay.bringToFront();
+            }
+       },
+
+       'getLayer': function(name) {
+           return wms.layer(this, name);
+       },
+
+       'addSubLayer': function(name) {
+           this._subLayers[name] = true;
+           this.refreshOverlay();
+       },
+
+       'removeSubLayer': function(name) {
+           delete this._subLayers[name];
+           this.refreshOverlay();
+       },
+
+       'refreshOverlay': function() {
+           var subLayers = Object.keys(this._subLayers).join(",");
+           if (!this._map) {
+               return;
+           }
+           if (!subLayers) {
+               this._overlay.remove();
+           } else {
+               this._overlay.setParams({'layers': subLayers});
+               this._overlay.addTo(this._map);
+           }
+       },
+
+       'identify': function(evt) {
+           // Identify map features in response to map clicks. To customize this
+           // behavior, create a class extending wms.Source and override one or
+           // more of the following hook functions.
+
+           var layers = this.getIdentifyLayers();
+           if (!layers.length) {
+               return;
+           }
+           this.getFeatureInfo(
+               evt.containerPoint, evt.latlng, layers,
+               this.showFeatureInfo
+           );
+       },
+
+       'getFeatureInfo': function(point, latlng, layers, callback) {
+           // Request WMS GetFeatureInfo and call callback with results
+           // (split from identify() to faciliate use outside of map events)
+           var params = this.getFeatureInfoParams(point, layers),
+               url = this._url + L.Util.getParamString(params, this._url);
+
+           this.showWaiting();
+           this.ajax(url, done);
+
+           function done(result) {
+               this.hideWaiting();
+               var text = this.parseFeatureInfo(result, url);
+               callback.call(this, latlng, text);
+           }
+       },
+
+       'ajax': function(url, callback) {
+           ajax.call(this, url, callback);
+       },
+
+       'getIdentifyLayers': function() {
+           // Hook to determine which layers to identify
+           if (this.options.identifyLayers)
+               return this.options.identifyLayers;
+           return Object.keys(this._subLayers);
+        },
+
+       'getFeatureInfoParams': function(point, layers) {
+           // Hook to generate parameters for WMS service GetFeatureInfo request
+           var wmsParams, overlay;
+           if (this.options.untiled) {
+               // Use existing overlay
+               wmsParams = this._overlay.wmsParams;
+           } else {
+               // Create overlay instance to leverage updateWmsParams
+               overlay = this.createOverlay(true);
+               overlay.updateWmsParams(this._map);
+               wmsParams = overlay.wmsParams;
+               wmsParams.layers = layers.join(',');
+           }
+           var infoParams = {
+               'request': 'GetFeatureInfo',
+               'query_layers': layers.join(','),
+               'X': Math.round(point.x),
+               'Y': Math.round(point.y)
+           };
+           return L.extend({}, wmsParams, infoParams);
+       },
+
+       'parseFeatureInfo': function(result, url) {
+           // Hook to handle parsing AJAX response
+
+           var newResult="";
+           var text=result
+          var inicio= fin='';
+          var isHomicidio=text.search('homicidiospormunicipio2016')
+          var isHomicidio1=text.search('homicidiospormunicipio2017')
+          var isHomicidio2=text.search('homicidiospormunicipio2018')
+          var isNivel=text.search('niveldeviolenciapormunicipio2016')
+          var isNivel1=text.search('niveldeviolenciapormunicipio2017')
+          var isNivel2=text.search('niveldeviolenciapormunicipio2018')
+          var isNivel3=text.search('niveldeviolenciapormunicipio2019')
+          var isDel=text.search('hurtospormunicipio')   
+          var isRobo=text.search('robospormunicipio')   
+          var isSitEco1=text.search('situacion1')
+          var isSitEco2=text.search('situacion2')
+          var isSitEco3=text.search('situacion3')
+          var isSitEco4=text.search('situacion4')
+          var isSitEco5=text.search('situacion5')          
+          var isSitEco6=text.search('situacion6')
+          var isSitEco7=text.search('situacion7')
+          console.log(result);
+               result=newResult; 
+          //fragmento=result.split(' ');
+          
+          var i=0;         
+          if(isHomicidio>0||isHomicidio1>0||isHomicidio2>0){
+            //na2
+            inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Municipio: '+text.substr(inicio+6,fin-(inicio+8))+', '
+          //homicidios
+          inicio=text.search('homicidios = ')
+          
+          fin=text.search('geom')
+          newResult=newResult+'homicidios: '+text.substr(inicio+14,fin-(inicio+16))+'.'
+          result=newResult
+        }
+          else if(isNivel>0||isNivel1>0||isNivel2>0){
+          inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Municipio: '+text.substr(inicio+6,fin-(inicio+8))+', '
+          //niveldevio
+          inicio=text.search('niveldevio = ')
+          fin=text.search('geom')
+          newResult=newResult+'Nivel de violencia: '+text.substr(inicio+14,fin-(inicio+16))+'.'
+          result=newResult
+        } else if(isNivel3>0){
+          inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Municipio: '+text.substr(inicio+6,fin-(inicio+8))+', '
+          //niveldevio
+          inicio=text.search('niveldevio = ')
+          fin=text.search('geom')
+          console.log(inicio);
+          console.log(fin);
+          newResult=newResult+'Promedio del nivel de violencia: '+text.substr(inicio+14,fin-(inicio+16))+'.'
+          result=newResult
+        }
+          else if(isDel>0){
+            inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Municipio: '+text.substr(inicio+6,fin-(inicio+8))+', '
+          //niveldevio
+          inicio=text.search('hurtosporm = ')
+          fin=text.search('geom')
+          newResult=newResult+'hurtos por municipio: '+text.substr(inicio+14,fin-(inicio+16))+'.'
+          result=newResult
+        }else if(isRobo>0){
+            inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Municipio: '+text.substr(inicio+6,fin-(inicio+8))+', '
+          //niveldevio
+          inicio=text.search('robospormu = ')
+          fin=text.search('geom')
+          newResult=newResult+'hurtos por municipio: '+text.substr(inicio+14,fin-(inicio+16))+'.'
+          result=newResult
+
+          //Departamentos
+        }else if(isSitEco1>0){            
+             //na2
+          inicio=text.search('na2')
+          fin=text.search('na3')            
+          newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('ingresospo')
+            fin=text.search('geom')
+            newResult=newResult+'Ingresos por persona mensualmente: $'+text.substr(inicio+13,fin-(inicio+15))+"."       
+            result=newResult
+          }else if(isSitEco2>0 ){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('tasadepers')
+            fin=text.search('geom')
+            newResult=newResult+'tasa de personas con dependencia economica '+text.substr(inicio+13,fin-(inicio+15))+"%."       
+            result=newResult
+          }
+         else if(isSitEco3>0){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('tasadepers')
+            fin=text.search('geom')
+            newResult=newResult+'Tasa de personas desempleadas: '+text.substr(inicio+13,fin-(inicio+15))+"%."       
+            result=newResult
+          }
+         else if(isSitEco4>0){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('poblacione')
+            fin=text.search('geom')
+            newResult=newResult+'Poblacion economicamente activa: '+text.substr(inicio+13,fin-(inicio+15))+"."       
+            result=newResult
+          }else if(isSitEco5>0){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('totaldeper')
+            fin=text.search('geom')
+            newResult=newResult+'Total de personas desempleadas: '+text.substr(inicio+13,fin-(inicio+15))+"."       
+            result=newResult
+          }else if(isSitEco6>0){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('totaldeper')
+            fin=text.search('geom')
+            newResult=newResult+'Total de personas desocupadas por hogar: '+text.substr(inicio+13,fin-(inicio+15))+"."       
+            result=newResult
+          }else if(isSitEco7>0){
+            //na2
+            inicio=text.search('na2')
+            fin=text.search('na3')            
+            newResult='Departamento: '+text.substr(inicio+6,fin-(inicio+8))+', '
+            
+            //ingresospo 
+            inicio=text.search('remesaspor')
+            fin=text.search('geom')
+            newResult=newResult+'Remesas por hogar mensualmente: $'+text.substr(inicio+13,fin-(inicio+15))+"."       
+            result=newResult
+          }
+
+
+           if (result == "error") {
+               // AJAX failed, possibly due to CORS issues.
+               // Try loading content in <iframe>.               
+                result = "<iframe src='" + url + "' style='border:none'>";         
+              }   
+              console.log(newResult)   
+           return result;
+       },
+
+       'showFeatureInfo': function(latlng, info) {
+           // Hook to handle displaying parsed AJAX response to the user
+           if (!this._map) {
+               return;
+           }
+           this._map.openPopup(info, latlng);
+       },
+
+       'showWaiting': function() {
+           // Hook to customize AJAX wait animation
+           if (!this._map)
+               return;
+           this._map._container.style.cursor = "progress";
+       },
+
+       'hideWaiting': function() {
+           // Hook to remove AJAX wait animation
+           if (!this._map)
+               return;
+           this._map._container.style.cursor = "default";
+       }
+   });
+
+   wms.source = function(url, options) {
+       return new wms.Source(url, options);
+   };
+
+   /*
+    * Layer
+    * Leaflet "layer" with all actual rendering handled via an underlying Source
+    * object.  Can be called directly with a URL to automatically create or reuse
+    * an existing Source.  Note that the auto-source feature doesn't work well in
+    * multi-map environments; so for best results, create a Source first and use
+    * getLayer() to retrieve wms.Layer instances.
+    */
+
+   wms.Layer = L.Layer.extend({
+       'initialize': function(source, layerName, options) {
+           L.setOptions(this, options);
+           if (!source.addSubLayer) {
+               // Assume source is a URL
+               source = wms.getSourceForUrl(source, options);
+           }
+           this._source = source;
+           this._name = layerName;
+       },
+       'onAdd': function() {
+           if (!this._source._map)
+               this._source.addTo(this._map);
+           this._source.addSubLayer(this._name);
+       },
+       'onRemove': function() {
+           this._source.removeSubLayer(this._name);
+       },
+       'setOpacity': function(opacity) {
+           this._source.setOpacity(opacity);
+       },
+       'bringToBack': function() {
+           this._source.bringToBack();
+       },
+       'bringToFront': function() {
+           this._source.bringToFront();
+       }
+   });
+
+   wms.layer = function(source, options) {
+       return new wms.Layer(source, options);
+   };
+
+   // Cache of sources for use with wms.Layer auto-source option
+   var sources = {};
+   wms.getSourceForUrl = function(url, options) {
+       if (!sources[url]) {
+           sources[url] = wms.source(url, options);
+       }
+       return sources[url];
+   };
+
+
+   // Copy tiled WMS layer from leaflet core, in case we need to subclass it later
+   wms.TileLayer = L.TileLayer.WMS;
+   wms.tileLayer = L.tileLayer.wms;
+
+   /*
+    * wms.Overlay:
+    * "Single Tile" WMS image overlay that updates with map changes.
+    * Portions of wms.Overlay are directly extracted from L.TileLayer.WMS.
+    * See Leaflet license.
+    */
+   wms.Overlay = L.Layer.extend({
+       'defaultWmsParams': {
+           'service': 'WMS',
+           'request': 'GetMap',
+           'version': '1.1.1',
+           'layers': '',
+           'styles': '',
+           'format': 'image/jpeg',
+           'transparent': false
+       },
+
+       'options': {
+           'crs': null,
+           'uppercase': false,
+           'attribution': '',
+           'opacity': 1,
+           'isBack': false,
+           'minZoom': 0,
+           'maxZoom': 18
+       },
+
+       'initialize': function(url, options) {
+           this._url = url;
+
+           // Move WMS parameters to params object
+           var params = {}, opts = {};
+           for (var opt in options) {
+                if (opt in this.options) {
+                    opts[opt] = options[opt];
+                } else {
+                    params[opt] = options[opt];
+                }
+           }
+           L.setOptions(this, opts);
+           this.wmsParams = L.extend({}, this.defaultWmsParams, params);
+       },
+
+       'setParams': function(params) {
+           L.extend(this.wmsParams, params);
+           this.update();
+       },
+
+       'getAttribution': function() {
+           return this.options.attribution;
+       },
+
+       'onAdd': function() {
+           this.update();
+       },
+
+       'onRemove': function(map) {
+           if (this._currentOverlay) {
+               map.removeLayer(this._currentOverlay);
+               delete this._currentOverlay;
+           }
+           if (this._currentUrl) {
+               delete this._currentUrl;
+           }
+       },
+
+       'getEvents': function() {
+           return {
+               'moveend': this.update
+           };
+       },
+
+       'update': function() {
+           if (!this._map) {
+               return;
+           }
+           // Determine image URL and whether it has changed since last update
+           this.updateWmsParams();
+           var url = this.getImageUrl();
+           if (this._currentUrl == url) {
+               return;
+           }
+           this._currentUrl = url;
+
+           // Keep current image overlay in place until new one loads
+           // (inspired by esri.leaflet)
+           var bounds = this._map.getBounds();
+           var overlay = L.imageOverlay(url, bounds, {'opacity': 0});
+           overlay.addTo(this._map);
+           overlay.once('load', _swap, this);
+           function _swap() {
+               if (!this._map) {
+                   return;
+               }
+               if (overlay._url != this._currentUrl) {
+                   this._map.removeLayer(overlay);
+                   return;
+               } else if (this._currentOverlay) {
+                   this._map.removeLayer(this._currentOverlay);
+               }
+               this._currentOverlay = overlay;
+               overlay.setOpacity(
+                   this.options.opacity ? this.options.opacity : 1
+               );
+               if (this.options.isBack === true) {
+                   overlay.bringToBack();
+               }
+               if (this.options.isBack === false) {
+                   overlay.bringToFront();
+               }
+           }
+           if ((this._map.getZoom() < this.options.minZoom) ||
+               (this._map.getZoom() > this.options.maxZoom)){
+               this._map.removeLayer(overlay);
+           }
+       },
+
+       'setOpacity': function(opacity) {
+            this.options.opacity = opacity;
+            if (this._currentOverlay) {
+                this._currentOverlay.setOpacity(opacity);
+            }
+       },
+
+       'bringToBack': function() {
+           this.options.isBack = true;
+           if (this._currentOverlay) {
+               this._currentOverlay.bringToBack();
+           }
+       },
+
+       'bringToFront': function() {
+           this.options.isBack = false;
+           if (this._currentOverlay) {
+               this._currentOverlay.bringToFront();
+           }
+       },
+
+       // See L.TileLayer.WMS: onAdd() & getTileUrl()
+       'updateWmsParams': function(map) {
+           if (!map) {
+               map = this._map;
+           }
+           // Compute WMS options
+           var bounds = map.getBounds();
+           var size = map.getSize();
+           var wmsVersion = parseFloat(this.wmsParams.version);
+           var crs = this.options.crs || map.options.crs;
+           var projectionKey = wmsVersion >= 1.3 ? 'crs' : 'srs';
+           var nw = crs.project(bounds.getNorthWest());
+           var se = crs.project(bounds.getSouthEast());
+
+           // Assemble WMS parameter string
+           var params = {
+               'width': size.x,
+               'height': size.y
+           };
+           params[projectionKey] = crs.code;
+           params.bbox = (
+               wmsVersion >= 1.3 && crs === L.CRS.EPSG4326 ?
+               [se.y, nw.x, nw.y, se.x] :
+               [nw.x, se.y, se.x, nw.y]
+           ).join(',');
+
+           L.extend(this.wmsParams, params);
+       },
+
+       'getImageUrl': function() {
+           var uppercase = this.options.uppercase || false;
+           var pstr = L.Util.getParamString(this.wmsParams, this._url, uppercase);
+           return this._url + pstr;
+       }
+   });
+
+   wms.overlay = function(url, options) {
+       return new wms.Overlay(url, options);
+   };
+
+   // Simple AJAX helper (since we can't assume jQuery etc. are present)
+   function ajax(url, callback) {
+       var context = this,
+           request = new XMLHttpRequest();
+       request.onreadystatechange = change;
+       console.log(url)
+       request.open('GET', url);
+       request.send();
+
+       function change() {
+           if (request.readyState === 4) {
+               if (request.status === 200) {
+                   callback.call(context, request.responseText);
+               } else {
+                   callback.call(context, "error");
+               }
+           }
+       }
+   }
+
+   return wms;
+
+   }));
+   </script>
+
+
+
+      <!--leaflet-panellayers-->
+      <script>(function (factory) {
+        if (typeof define === 'function' && define.amd) {
+          //AMD
+          define(['leaflet'], factory);
+        } else if (typeof module !== 'undefined') {
+          // Node/CommonJS
+          module.exports = factory(require('leaflet'));
+        } else {
+          // Browser globals
+          if (typeof window.L === 'undefined')
+            throw 'Leaflet must be loaded first';
+          factory(window.L);
+        }
+        })(function (L) {
+
+        L.Control.PanelLayers = L.Control.Layers.extend({
+
+          includes: L.version[0]==='1' ? L.Evented.prototype : L.Mixin.Events,
+
+          options: {
+            compact: false,
+            compactOffset: 0,
+            collapsed: false,
+            autoZIndex: true,
+            collapsibleGroups: false,
+            buildItem: null,				//function that return row item html node(or html string)
+            title: '',						//title of panel
+            className: '',					//additional class name for panel
+            position: 'topright'
+          },
+
+          initialize: function (baseLayers, overlays, options) {
+            L.setOptions(this, options);
+            this._layers = [];
+            this._groups = {};
+            this._items = {};
+            this._layersActives = [];
+            this._lastZIndex = 0;
+            this._handlingClick = false;
+
+            this.className = 'leaflet-panel-layers';
+
+            var i, n, isCollapsed;
+
+            for (i in baseLayers) {
+              if (baseLayers[i].group && baseLayers[i].layers) {
+                isCollapsed = baseLayers[i].collapsed || false;
+                for (n in baseLayers[i].layers)
+                  this._addLayer(baseLayers[i].layers[n], false, baseLayers[i].group, isCollapsed);
+              }
+              else
+                this._addLayer(baseLayers[i], false);
+            }
+
+            for (i in overlays) {
+              if (overlays[i].group && overlays[i].layers) {
+                isCollapsed = overlays[i].collapsed || false;
+                for (n in overlays[i].layers)
+                  this._addLayer(overlays[i].layers[n], true, overlays[i].group, isCollapsed);
+              }
+              else
+                this._addLayer(overlays[i], true);
+            }
+          },
+
+          onAdd: function (map) {
+
+            var self = this;
+            
+            for (var i in this._layersActives) {
+              map.addLayer(this._layersActives[i]);
+            }
+
+            L.Control.Layers.prototype.onAdd.call(this, map);
+
+            this._map.on('resize', function(e) {
+              self._updateHeight(e.newSize.y);
+            });
+
+            return this._container;
+          },
+
+          //TODO addBaseLayerGroup
+          //TODO addOverlayGroup
+
+          addBaseLayer: function (layer, name, group) {
+            layer.name = name || layer.name || '';
+            this._addLayer(layer, false, group);
+            this._update();
+            return this;
+          },
+
+          addOverlay: function (layer, name, group) {
+            layer.name = name || layer.name || '';
+            this._addLayer(layer, true, group);
+            this._update();
+            return this;
+          },
+
+          removeLayer: function (layerDef) {
+            var layer = layerDef.hasOwnProperty('layer') ? this._layerFromDef(layerDef) : layerDef;
+
+            this._map.removeLayer(layer);
+
+            L.Control.Layers.prototype.removeLayer.call(this, layer);
+            return this;
+          },
+
+          clearLayers: function () {
+            for (var i = 0; i < this._layers.length; i++) {
+              this.removeLayer(this._layers[i]);
+            }
+          },
+
+          _layerFromDef: function (layerDef) {
+            for (var i = 0; i < this._layers.length; i++) {
+              var id = L.stamp(this._layers[i].layer);
+              //TODO add more conditions to comparing definitions
+              if (this._getLayer(id).name === layerDef.name)
+                return this._getLayer(id).layer;
+            }
+          },
+
+          _update: function () {
+            this._groups = {};
+            this._items = {};
+            L.Control.Layers.prototype._update.call(this);
+          },
+
+          _getLayer: function (id) {
+            for (var i = 0; i < this._layers.length; i++) {
+              if (this._layers[i] && this._layers[i].id == id) {
+                return this._layers[i];
+              }
+            }
+          },
+
+          _addLayer: function (layerDef, overlay, group, isCollapsed) {
+
+            if(!layerDef.layer)
+              throw new Error('layer not defined in item: '+(layerDef.name||''));
+
+            if (!(layerDef.layer instanceof L.Class) &&
+              (layerDef.layer.type && layerDef.layer.args)) {
+              layerDef.layer = this._getPath(L, layerDef.layer.type).apply(L, layerDef.layer.args);
+            }
+
+            if(!layerDef.hasOwnProperty('id'))
+              layerDef.id = L.stamp(layerDef.layer);
+
+            if(layerDef.active)
+              this._layersActives.push(layerDef.layer);
+
+            this._layers.push(L.Util.extend(layerDef, {
+              collapsed: isCollapsed,
+              overlay: overlay,
+              group: group
+            }));
+
+            if (this.options.autoZIndex && layerDef.layer && layerDef.layer.setZIndex) {
+              this._lastZIndex++;
+              layerDef.layer.setZIndex(this._lastZIndex);
+            }
+
+          },
+
+          _createItem: function (obj) {
+
+            var self = this;
+
+            var item, input, checked;
+
+            item = L.DomUtil.create('div', this.className + '-item' + (obj.active ? ' active' : ''));
+
+            checked = this._map.hasLayer(obj.layer);
+
+            if (obj.overlay) {
+              input = L.DomUtil.create('input', this.className + '-selector');
+              input.type = 'checkbox';
+              input.defaultChecked = checked;
+              //TODO name
+            } else
+              input = this._createRadioElement('leaflet-base-layers', checked, obj);
+
+            input.value = obj.id;
+            input.layerId = obj.id;
+            input.id = obj.id;
+            input._layer = obj;
+
+            L.DomEvent.on(input, 'click', function (e) {
+
+              self._onInputClick();
+
+              if (e.target.checked) {
+                self.fire('panel:selected', e.target._layer);
+              } else {
+                self.fire('panel:unselected', e.target._layer);
+              }
+
+            }, this);
+
+            var label = L.DomUtil.create('label', this.className + '-title');
+            //TODO label.htmlFor = input.id;
+            var title = L.DomUtil.create('span');
+            title.innerHTML = obj.name || '';
+
+            if (obj.icon) {
+              var icon = L.DomUtil.create('i', this.className + '-icon');
+
+              if (typeof obj.icon === 'string')
+                icon.innerHTML = obj.icon || '';
+              else
+                icon.appendChild(obj.icon);
+
+              label.appendChild(icon);
+            }
+
+            label.appendChild(input);
+            label.appendChild(title);
+            item.appendChild(label);
+
+            if (this.options.buildItem) {
+              var node = this.options.buildItem.call(this, obj); //custom node node or html string
+              if (typeof node === 'string') {
+                var tmp = L.DomUtil.create('div');
+                tmp.innerHTML = node;
+                item.appendChild(tmp.firstChild);
+              }
+              else
+                item.appendChild(node);
+            }
+
+            this._items[input.value] = item;
+
+            return item;
+          },
+
+          // IE7 bugs out if you create a radio dynamically, so you have to do it this hacky way (see http://bit.ly/PqYLBe)
+          _createRadioElement: function (name, checked, obj) {
+
+            var radioHtml = '<input type="radio" class="' + this.className + '-selector" name="' + name + '" id="' + obj.id + '" onClick="getRadio(event)"';
+            if (checked) {
+              radioHtml += ' checked="checked"';
+            }
+            radioHtml += ' />';
+
+            var radioFragment = document.createElement('div');
+            radioFragment.innerHTML = radioHtml;
+
+            return radioFragment.firstChild;
+          },
+
+          _addItem: function (obj) {
+            var self = this,
+              label, input, icon, checked;
+
+            var list = obj.overlay ? this._overlaysList : this._baseLayersList;
+
+            if (obj.group) {
+              if (!obj.group.hasOwnProperty('name'))
+                obj.group = {name: obj.group};
+
+              if (!this._groups[obj.group.name]) {
+                var collapsed = false;
+                if (obj.collapsed === true)
+                  collapsed = true;
+                this._groups[obj.group.name] = this._createGroup(obj.group, collapsed);
+              }
+
+              list.appendChild(this._groups[obj.group.name]);
+              list = this._groups[obj.group.name];
+            }
+
+            label = this._createItem(obj);
+
+            list.appendChild(label);
+
+            return label;
+          },
+
+          _createGroup: function (groupdata, isCollapsed) {
+
+            var self = this,
+              groupdiv = L.DomUtil.create('div', this.className + '-group'),
+              grouplabel, grouptit, groupexp,
+
+
+            grouplabel = L.DomUtil.create('label', this.className + '-grouplabel', groupdiv);
+            var i;
+
+
+            if (this.options.collapsibleGroups) {
+
+              L.DomUtil.addClass(groupdiv, 'collapsible');
+
+              groupexp = L.DomUtil.create('i', this.className + '-icon', grouplabel);
+
+              if (isCollapsed === true)
+                groupexp.innerHTML = ' + ';
+              else
+                groupexp.innerHTML = ' - ';
+
+              L.DomEvent.on(grouplabel, 'click', function () {
+                if (L.DomUtil.hasClass(groupdiv, 'expanded')) {
+                  L.DomUtil.removeClass(groupdiv, 'expanded');
+                  groupexp.innerHTML = ' + ';
+                } else {
+                  L.DomUtil.addClass(groupdiv, 'expanded');
+                  groupexp.innerHTML = ' - ';
+                }
+                self._updateHeight();
+              });
+
+              if (isCollapsed === false)
+                L.DomUtil.addClass(groupdiv, 'expanded');
+            }
+
+            grouptit = L.DomUtil.create('span', this.className + '-title', grouplabel);
+            grouptit.innerHTML = groupdata.name;
+
+
+            return groupdiv;
+          },
+
+          _onInputClick: function () {
+            var i, input, obj,
+              inputs = this._form.getElementsByClassName(this.className + '-selector'),
+              inputsLen = inputs.length;
+
+            this._handlingClick = true;
+
+            for (i = 0; i < inputsLen; i++) {
+
+              input = inputs[i];
+
+              obj = this._getLayer(input.value);
+              if (!input.checked && this._map.hasLayer(obj.layer)) {
+                L.DomUtil.removeClass(input.parentNode.parentNode, 'active');
+                this._map.removeLayer(obj.layer);
+             
+
+              } else  if (input.checked && !this._map.hasLayer(obj.layer)) {
+                L.DomUtil.addClass(input.parentNode.parentNode, 'active');
+                this._map.addLayer(obj.layer);
+              }
+            }
+
+            this._handlingClick = false;
+
+            this._refocusOnMap();
+          },
+
+
+          _initLayout: function () {
+            var container = this._container = L.DomUtil.create('div', this.className);
+
+            if(this.options.compact)
+              L.DomUtil.addClass(container, 'compact');
+
+            //Makes this work on IE10 Touch devices by stopping it from firing a mouseout event when the touch is released
+            container.setAttribute('aria-haspopup', true);
+
+            L.DomEvent
+              .disableClickPropagation(container)
+              .disableScrollPropagation(container);
+
+            if (this.options.className)
+              L.DomUtil.addClass(container, this.options.className);
+
+            this._section = this._form = L.DomUtil.create('form', this.className + '-list');
+
+            this._updateHeight();
+
+            if (this.options.collapsed) {
+
+              if (L.Browser.android)
+                L.DomEvent
+                  .on(container, 'click', this._expand, this);
+              else {
+                L.DomEvent
+                  .on(container, 'mouseenter', this._expand, this)
+                  .on(container, 'mouseleave', this._collapse, this);
+              }
+
+              this._map.on('click', this._collapse, this);
+
+            } else {
+              this._expand();
+            }
+
+            this._baseLayersList = L.DomUtil.create('div', this.className + '-base', this._form);
+            this._separator = L.DomUtil.create('div', this.className + '-separator', this._form);
+            this._overlaysList = L.DomUtil.create('div', this.className + '-overlays', this._form);
+
+            /* maybe useless
+            if (!this.options.compact)
+              L.DomUtil.create('div', this.className + '-margin', this._form);*/
+
+            if (this.options.title) {
+              var titlabel = L.DomUtil.create('label', this.className + '-title');
+              titlabel.innerHTML = '<span>' + this.options.title + '</span>';
+              container.appendChild(titlabel);
+            }
+
+            container.appendChild(this._form);
+          },
+
+          _updateHeight: function (h) {
+            h = h || this._map.getSize().y;
+
+            if (this.options.compact)
+              this._form.style.maxHeight = (h - this.options.compactOffset) + 'px';
+            else
+              this._form.style.height = h + 'px';
+          },
+
+          _expand: function () {
+            L.DomUtil.addClass(this._container, 'expanded');
+          },
+
+          _collapse: function () {
+            this._container.className = this._container.className.replace('expanded', '');
+          },
+
+          _getPath: function (obj, prop) {
+            var parts = prop.split('.'),
+              last = parts.pop(),
+              len = parts.length,
+              cur = parts[0],
+              i = 1;
+
+            if (len > 0)
+              while ((obj = obj[cur]) && i < len)
+                cur = parts[i++];
+
+            if (obj)
+              return obj[last];
+          }
+        });
+
+        L.control.panelLayers = function (baseLayers, overlays, options) {
+          return new L.Control.PanelLayers(baseLayers, overlays, options);
+        };
+
+        return L.Control.PanelLayers;
+
+        });</script>
+
+   <!--mi script-->
+    <script src="map.js"></script>
+
+
+</body>
+</html>

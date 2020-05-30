@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta http-equiv=”Content-Type” content=”text/html; charset=iso-8859-2″>
+    <title>GIS GP:06 SGG115</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+         integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+        crossorigin=""/>
+    <link rel="stylesheet" href="css/leaflet-categorized-layer.css"/>
+    <link rel="stylesheet" href="css/leaflet-panel-layers.css"/>
+    <link rel="stylesheet" href="css/legend.css"/>
+    <link rel="stylesheet" href="css/topbar.css"/>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+    body {
+      margin: 0;
+      background-color: #f1f1f1;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    
+    #navbar {
+      background-color: #333;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      display: block;
+      transition: top 0.3s;
+    }
+    
+    #navbar a {
+      float: left;
+      display: block;
+      color: #f2f2f2;
+      text-align: center;
+      padding: 15px;
+      text-decoration: none;
+      font-size: 17px;
+    }
+    
+    #navbar a:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    </style>
+</head>
+<body background="fondo.gif">
+
+  <div id="navbar">
+    <a href="index.html">INCIO</a>
+    <a href="gis.html" onclick="reiniciarMapa()">SIGFIDA-PTI</a>
+    <a href="contactos.html">CONTACTOS</a>
+  </div>
+  
+  <div style="padding:10px 150px 2500px;font-size:25px;color:white;margin-top:30px; text-align: justify;">
+    <center><h3><b>Sistema de Informaci&oacute;n geogr&aacute;fico para el an&aacute;lisis de los factores que influyen en la distribuci&oacute;n de las antenas PTI (Phoenix Tower International) en el &aacute;rea metropolitana</b></h3></center>
+    <center> <img src="antenna.gif"> <img src="antena.gif"> <img src="antenna.gif"> <img src="antena.gif"> <img src="antenna.gif"></center> 
+    <p>El proyecto surge por la necesidad de tener disponible la informaci&oacute;n acerca de la distribuci&oacute;n de antenas de PTI a lo largo y ancho de la Zona Metropolitana, para poder estimar la cobertura, y, segundo, ser capaz analizar c&oacute;mo factores relacionados con la calidad de vida (ingresos, seguridad, etc) en los diferentes municipios afectan en la instalaci&oacute;n de nuevas antenas para mejorar la cobertura, para lo cual se necesita de disponer de dicha informaci&oacute;n. Teniendo este conjunto de informaci&oacute;n requerida una caracter&iacute;stica geogr&aacute;fica, se vuelve necesario el uso de un SIG que permita mostrar y manipular dicha informaci&oacute;n, y as&iacute; poder realizar el an&aacute;lisis y facilitar la toma de decisiones.</p>
+  <p   >El sistema tiene el enfoque de analizar en el &aacute;rea metropolitana el efecto que tienen en la distribuci&oacute;n de instalaci&oacute;n y arrendamiento de soluciones de antenas de parte de PTI por diversos factores pudiendo ser el nivel de violencia, delitos cometidos, dependencia econ&oacute;mica y otros factores en la poblaci&oacute;n que influyen en las zonas que se catalogan como de alto riesgo para la seguridad del personal que labora en la colocaci&oacute;n del equipamiento que cuenta con una variedad de tipos de torres (Autosoportadas, monopolos, vallas, postes, arriostradas y rooftop), que tienen variedad de altura, marca, coordenadas de latitud y longitud de donde est&aacute;n instaladas de PTI.</p>
+
+  <center><img src="antena.gif"> <img src="antenna.gif"> <img src="antena.gif"> <img src="antenna.gif"> <img src="antena.gif"> <img hidden src="antenna.gif"></center>
+</div>
+ 
+
+  <script>
+  var prevScrollpos = window.pageYOffset;
+  window.onscroll = function() {
+  var currentScrollPos = window.pageYOffset;
+    if (prevScrollpos > currentScrollPos) {
+      document.getElementById("navbar").style.top = "0";
+    } else {
+      document.getElementById("navbar").style.top = "-50px";
+    }
+    prevScrollpos = currentScrollPos;
+  }
+  </script>
+  
+
+
+</body>
+</html>

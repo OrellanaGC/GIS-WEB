@@ -1,0 +1,36 @@
+#header-img {
+    margin-left: 20px;
+    margin-top: 10px;
+    height: 100px;
+    width: 100px;
+    float: left;
+  }
+  
+  #nav-bar {
+    text-align: right;
+    padding: 20px;
+    background-color: #A7A7A9;
+  }
+  
+  li {
+    display: inline;
+    list-style: none;
+  }
+  
+  ul {
+    top: 5px;
+    left: 10px;
+  }
+  
+  .nav-link {
+    width: auto;
+    height: 50px;
+    margin-left: 40px;
+    margin-top: 25px;
+    display: inline-block;
+    color: #453F3C;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: .9px;
+    text-decoration: none;
+  }

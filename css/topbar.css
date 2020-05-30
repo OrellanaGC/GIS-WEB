@@ -1,0 +1,19 @@
+
+.header_front{
+    display:block;
+    }
+h1{
+    text-align:center;
+    color:#fff;
+    }
+h4{
+    text-align:center;
+    color:#fff;
+    padding-top:5px;
+    margin:5px 0 0 0;
+    font-size:20px;
+ 
+    } 
+.boton_transparencia{
+    float:right;
+    }
